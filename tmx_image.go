@@ -48,6 +48,8 @@ type ImageLayer struct {
 	Opacity float32 `xml:"opacity,attr"`
 	// Whether the layer is shown (1) or hidden (0). Defaults to 1.
 	Visible bool `xml:"visible,attr"`
+	// A color that is multiplied with the image drawn by this layer. (optional)
+	TintColor *HexColor `xml:"tintcolor,attr"`
 	// Custom properties
 	Properties Properties `xml:"properties>property"`
 	// The group image

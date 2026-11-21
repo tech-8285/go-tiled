@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="4" height="4" tilewidth="8" tileheight="8" infinite="0" nextlayerid="10" nextobjectid="2">
+ <tileset firstgid="1" name="rendermap" tilewidth="8" tileheight="8" tilecount="2" columns="2">
+  <image source="tilesets/render_map_tiles.png" width="16" height="8"/>
+ </tileset>
+ <layer id="1" name="ground" width="4" height="4">
+  <data encoding="csv">
+1,1,1,1,
+1,1,1,1,
+1,1,1,1,
+1,1,1,1
+</data>
+ </layer>
+ <imagelayer id="2" name="overlay" offsetx="8" offsety="8" opacity="0.5">
+  <image source="render_map_image.png" width="8" height="8"/>
+ </imagelayer>
+ <group id="3" name="grp" offsetx="8" opacity="0.5" tintcolor="#00FF00">
+  <group id="4" name="nested" offsety="8">
+   <layer id="5" name="whitetiles" width="4" height="4">
+    <data encoding="csv">
+2,0,0,0,
+0,0,0,0,
+0,0,0,0,
+0,0,0,0
+</data>
+   </layer>
+  </group>
+  <imagelayer id="6" name="hidden_image" visible="0">
+   <image source="render_map_image.png" width="8" height="8"/>
+  </imagelayer>
+ </group>
+ <objectgroup id="7" name="objects">
+  <object id="1" gid="1" x="24" y="32" width="8" height="8"/>
+ </objectgroup>
+ <layer id="8" name="top" width="4" height="4">
+  <data encoding="csv">
+0,0,0,0,
+0,0,0,0,
+0,0,0,0,
+0,0,0,2
+</data>
+ </layer>
+</map>

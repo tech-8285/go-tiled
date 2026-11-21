@@ -31,11 +31,10 @@ func main() {
 		return
 	}
 
-	if err = rend.RenderVisibleLayers(); err != nil {
+	if err = rend.RenderMap(); err != nil {
 		fmt.Println(err)
 		return
 	}
-	// rend.RenderLayer(1)
 
 	w, err := os.Create(img)
 	if err != nil {

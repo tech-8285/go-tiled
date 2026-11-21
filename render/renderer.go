@@ -167,6 +167,15 @@ func (r *Renderer) getTileImage(tile *tiled.LayerTile) (image.Image, error) {
 }
 
 func (r *Renderer) _renderLayer(layer *tiled.Layer) error {
+	// Legacy per-layer rendering: only the layer's own opacity is applied;
+	// layer offsets and tint colors are honored by RenderMap instead.
+	return r.renderLayer(layer, 0, 0, layer.Opacity, nil)
+}
+
+// renderLayer draws a single tile layer, translating it by (offsetX, offsetY)
+// screen pixels, modulating it by opacity (0-1) and multiplying all tile
+// colors by tint (nil means no tinting).
+func (r *Renderer) renderLayer(layer *tiled.Layer, offsetX, offsetY float64, opacity float32, tint *tiled.HexColor) error {
 	// TODO: layer.ParallaxX/Y and Map.ParallaxOriginX/Y aren't applied here --
 	// every layer is drawn at the same 1:1 position regardless of its parallax
 	// factor. This renderer only produces a single static, full-map image with
@@ -185,6 +194,11 @@ func (r *Renderer) _renderLayer(layer *tiled.Layer) error {
 		return ErrUnsupportedRenderOrder
 	}
 
+	// Layer offsets are expressed in screen pixels, so they apply uniformly
+	// on top of the orientation-specific tile positions for all four map
+	// orientations.
+	offset := image.Pt(int(offsetX), int(offsetY))
+
 	i := 0
 	for y := ys; y*yi < ye; y = y + yi {
 		for x := xs; x*xi < xe; x = x + xi {
@@ -198,14 +212,18 @@ func (r *Renderer) _renderLayer(layer *tiled.Layer) error {
 				return err
 			}
 
-			pos := r.engine.GetTilePosition(x, y, img.Bounds().Size())
+			pos := r.engine.GetTilePosition(x, y, img.Bounds().Size()).Add(offset)
 			rect := image.Rectangle{Min: pos, Max: pos.Add(img.Bounds().Size())}
+
+			if tint != nil {
+				img = tintImage(img, tint)
+			}
 
 			// TODO: layer.Mode (compositing/blend mode, e.g. "multiply",
 			// "screen", ...) isn't honored -- every layer is composited with
 			// plain draw.Over ("normal" mode), regardless of what Mode is set to.
-			if layer.Opacity < 1 {
-				mask := image.NewUniform(color.Alpha{uint8(layer.Opacity * 255)})
+			if opacity < 1 {
+				mask := image.NewUniform(color.Alpha{uint8(opacity * 255)})
 
 				draw.DrawMask(r.Result, rect, img, img.Bounds().Min, mask, mask.Bounds().Min, draw.Over)
 			} else {

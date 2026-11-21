@@ -44,6 +44,12 @@ func (color *HexColor) RGBA() (r, g, b, a uint32) {
 	return color.c.RGBA()
 }
 
+// Components returns the color's red, green, blue and alpha components as
+// 8-bit, non-premultiplied values.
+func (color *HexColor) Components() (r, g, b, a uint8) {
+	return color.c.R, color.c.G, color.c.B, color.c.A
+}
+
 func (color *HexColor) String() string {
 	src := []byte{
 		color.c.A,

@@ -83,6 +83,8 @@ type Layer struct {
 	Opacity float32 `xml:"opacity,attr"`
 	// Whether the layer is shown (1) or hidden (0). Defaults to 1.
 	Visible bool `xml:"visible,attr"`
+	// A color that is multiplied with any tiles drawn by this layer. (optional)
+	TintColor *HexColor `xml:"tintcolor,attr"`
 	// Rendering offset for this layer in pixels. Defaults to 0. (since 0.14)
 	OffsetX float64 `xml:"offsetx,attr"`
 	// Rendering offset for this layer in pixels. Defaults to 0. (since 0.14)

@@ -127,6 +127,23 @@ type Map struct {
 	ImageLayers []*ImageLayer `xml:"imagelayer"`
 	// Group layers
 	Groups []*Group `xml:"group"`
+
+	// layerOrder records the document order of the layer, objectgroup,
+	// imagelayer and group child elements, which is the order Tiled renders
+	// them in. It is populated while decoding; nil for maps built in code.
+	layerOrder []LayerRef
+}
+
+// LayersInOrder returns references to all top-level layers of the map — tile
+// layers, object groups, image layers and groups — in the order they appear
+// in the map file, which is the order Tiled renders them in. For maps that
+// were constructed in code rather than decoded from a file, the historical
+// order (tile layers, object groups, image layers, groups) is returned.
+func (m *Map) LayersInOrder() []LayerRef {
+	if m.layerOrder != nil {
+		return m.layerOrder
+	}
+	return layerOrderFallback(len(m.Layers), len(m.ObjectGroups), len(m.ImageLayers), len(m.Groups))
 }
 
 func (m *Map) initTileset(ts *Tileset) error {
@@ -199,6 +216,18 @@ func (m *Map) GetFileFullPath(fileName string) string {
 	return filepath.Join(m.baseDir, fileName)
 }
 
+// mapDecode mirrors Map for XML decoding. The layer-kind fields shadow the
+// promoted aliasMap fields (a shallower field wins over an embedded one with
+// the same XML name) so that each layer element is decoded individually and
+// its document position recorded in the shared order list.
+type mapDecode struct {
+	aliasMap
+	TileLayers tileLayerSeq   `xml:"layer"`
+	ObjGroups  objectGroupSeq `xml:"objectgroup"`
+	ImgLayers  imageLayerSeq  `xml:"imagelayer"`
+	SubGroups  groupSeq       `xml:"group"`
+}
+
 // UnmarshalXML decodes a single XML element beginning with the given start element.
 func (m *Map) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	item := aliasMap{
@@ -207,9 +236,23 @@ func (m *Map) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	}
 	item.SetDefaults()
 
-	if err := d.DecodeElement(&item, &start); err != nil {
+	var order []LayerRef
+	dec := mapDecode{aliasMap: item}
+	dec.TileLayers.order = &order
+	dec.ObjGroups.order = &order
+	dec.ImgLayers.order = &order
+	dec.SubGroups.order = &order
+
+	if err := d.DecodeElement(&dec, &start); err != nil {
 		return err
 	}
+
+	item = dec.aliasMap
+	item.Layers = dec.TileLayers.Layers
+	item.ObjectGroups = dec.ObjGroups.ObjectGroups
+	item.ImageLayers = dec.ImgLayers.ImageLayers
+	item.Groups = dec.SubGroups.Groups
+	item.layerOrder = order
 
 	// Decode Groups data
 	for i := 0; i < len(item.Groups); i++ {

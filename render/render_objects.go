@@ -82,6 +82,9 @@ func (r *Renderer) _renderGroup(group *tiled.Group) error {
 // RenderVisibleLayersAndObjectGroups render all layers and object groups, layer first, objectGroup second
 // so the order may be incorrect,
 // you may put them into different groups, then call RenderVisibleGroups
+//
+// Deprecated: use RenderMap instead, which renders every layer kind in the
+// exact order the layers appear in the map file.
 func (r *Renderer) RenderVisibleLayersAndObjectGroups() error {
 	// TODO: The order maybe incorrect
 
@@ -122,6 +125,17 @@ type positionedObject struct {
 }
 
 func (r *Renderer) _renderObjectGroup(objectGroup *tiled.ObjectGroup) error {
+	for _, obj := range r.sortedObjects(objectGroup) {
+		if err := r.renderOneObject(objectGroup, obj.obj, obj.sx, obj.sy); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// sortedObjects returns the group's objects paired with their projected
+// screen positions, sorted back-to-front.
+func (r *Renderer) sortedObjects(objectGroup *tiled.ObjectGroup) []positionedObject {
 	objs := make([]positionedObject, len(objectGroup.Objects))
 	for i, obj := range objectGroup.Objects {
 		sx, sy := r.engine.PixelToScreenCoords(obj.X, obj.Y)
@@ -139,12 +153,7 @@ func (r *Renderer) _renderObjectGroup(objectGroup *tiled.ObjectGroup) error {
 		return a.sx < b.sx
 	})
 
-	for _, obj := range objs {
-		if err := r.renderOneObject(objectGroup, obj.obj, obj.sx, obj.sy); err != nil {
-			return err
-		}
-	}
-	return nil
+	return objs
 }
 
 // RenderGroupObjectGroup renders single object group in a certain group.
@@ -164,6 +173,14 @@ func (r *Renderer) RenderGroupObjectGroup(groupID, objectGroupID int) error {
 }
 
 func (r *Renderer) renderOneObject(layer *tiled.ObjectGroup, o *tiled.Object, screenX, screenY float64) error {
+	// Legacy per-layer rendering: only the object group's own opacity is
+	// applied; offsets and tint colors are honored by RenderMap instead.
+	return r.renderObject(o, screenX, screenY, layer.Opacity, nil)
+}
+
+// renderObject draws a single tile object at its projected screen position,
+// modulated by opacity (0-1) and multiplied by tint (nil means no tinting).
+func (r *Renderer) renderObject(o *tiled.Object, screenX, screenY float64, opacity float32, tint *tiled.HexColor) error {
 	if !o.Visible {
 		return nil
 	}
@@ -200,11 +217,15 @@ func (r *Renderer) renderOneObject(layer *tiled.ObjectGroup, o *tiled.Object, sc
 
 	img, originPoint = r._rotateObjectImage(img, o.Rotation, anchor)
 
+	if tint != nil {
+		img = tintImage(img, tint)
+	}
+
 	bounds = img.Bounds()
 	pos := bounds.Add(image.Pt(int(screenX), int(screenY)).Sub(originPoint))
 
-	if layer.Opacity < 1 {
-		mask := image.NewUniform(color.Alpha{uint8(layer.Opacity * 255)})
+	if opacity < 1 {
+		mask := image.NewUniform(color.Alpha{uint8(opacity * 255)})
 
 		draw.DrawMask(r.Result, pos, img, img.Bounds().Min, mask, mask.Bounds().Min, draw.Over)
 	} else {
