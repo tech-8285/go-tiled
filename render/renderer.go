@@ -47,6 +47,11 @@ var (
 
 	// ErrOutOfBounds represents an error that the index is out of bounds
 	ErrOutOfBounds = errors.New("tiled/render: index out of bounds")
+
+	// ErrTileImageNotFound represents an error that a tile has no image that
+	// can be rendered, e.g. an image-collection tileset entry without an
+	// <image> or an animation frame referencing a non-existent tile.
+	ErrTileImageNotFound = errors.New("tiled/render: tile image not found")
 )
 
 // RendererEngine is the interface implemented by objects that provide rendering engine for Tiled maps.
@@ -80,6 +85,14 @@ type Renderer struct {
 	tileCache map[uint32]image.Image
 	engine    RendererEngine
 	fs        fs.FS
+
+	// Animated tile state. Animation is disabled by default, so maps render
+	// exactly as their tiles are placed; SetAnimationTime switches it on.
+	animationsEnabled bool
+	animationTimeMS   uint64
+	// animatedTileCache caches the frame selected for each placed global tile
+	// ID at animationTimeMS, and is reset whenever the time changes.
+	animatedTileCache map[uint32]animatedTile
 }
 
 // NewRenderer creates new rendering engine instance.
@@ -89,7 +102,12 @@ func NewRenderer(m *tiled.Map) (*Renderer, error) {
 
 // NewRendererWithFileSystem creates new rendering engine instance with a custom file system.
 func NewRendererWithFileSystem(m *tiled.Map, fs fs.FS) (*Renderer, error) {
-	r := &Renderer{m: m, tileCache: make(map[uint32]image.Image), fs: fs}
+	r := &Renderer{
+		m:                 m,
+		tileCache:         make(map[uint32]image.Image),
+		animatedTileCache: make(map[uint32]animatedTile),
+		fs:                fs,
+	}
 	switch r.m.Orientation {
 	case "orthogonal":
 		r.engine = &OrthogonalRendererEngine{}
@@ -122,28 +140,67 @@ func (r *Renderer) open(f string) (io.ReadCloser, error) {
 // tiles scaled to the map's grid cell size, using FillMode ("stretch" or
 // "preserve-aspect-fit") to decide how; that resizing isn't implemented.
 func (r *Renderer) getTileImage(tile *tiled.LayerTile) (image.Image, error) {
-	timg, ok := r.tileCache[tile.Tileset.FirstGID+tile.ID]
-	if ok {
+	// Animated tiles swap in the frame's tile image, but tile still carries
+	// the placement's flip/rotation flags, which are applied below so the
+	// transform of the original placement is preserved.
+	imageID := tile.ID
+	if r.animationsEnabled {
+		imageID = r.resolveAnimatedTile(tile)
+	}
+
+	cacheKey := tile.Tileset.FirstGID + imageID
+	if timg, ok := r.tileCache[cacheKey]; ok {
 		return r.engine.RotateTileImage(tile, timg), nil
 	}
-	// Precache all tiles in tileset
-	if tile.Tileset.Image == nil {
-		for i := 0; i < len(tile.Tileset.Tiles); i++ {
-			if tile.Tileset.Tiles[i].ID == tile.ID {
-				sf, err := r.open(tile.Tileset.GetFileFullPath(tile.Tileset.Tiles[i].Image.Source))
-				if err != nil {
-					return nil, err
-				}
-				defer sf.Close()
-				timg, _, err = image.Decode(sf)
-				if err != nil {
-					return nil, err
-				}
-				r.tileCache[tile.Tileset.FirstGID+tile.ID] = timg
+
+	timg, err := r.loadTileImage(tile.Tileset, imageID)
+	if err != nil {
+		return nil, err
+	}
+	return r.engine.RotateTileImage(tile, timg), nil
+}
+
+// loadTileImage loads and caches the raw (untransformed) image of tileset-local
+// tileID. Both atlas tilesets (a single <image> cropped per tile) and
+// image-collection tilesets (one <image> per tile entry) go through this same
+// path, which is what keeps animated frame rendering identical for both.
+func (r *Renderer) loadTileImage(ts *tiled.Tileset, tileID uint32) (image.Image, error) {
+	cacheKey := ts.FirstGID + tileID
+	if timg, ok := r.tileCache[cacheKey]; ok {
+		return timg, nil
+	}
+
+	var timg image.Image
+	if ts.Image == nil {
+		// Image-collection tileset: find the tile entry carrying its own image.
+		var entry *tiled.TilesetTile
+		for i := 0; i < len(ts.Tiles); i++ {
+			if ts.Tiles[i].ID == tileID {
+				entry = ts.Tiles[i]
+				break
 			}
 		}
+		if entry == nil || entry.Image == nil {
+			return nil, ErrTileImageNotFound
+		}
+
+		sf, err := r.open(ts.GetFileFullPath(entry.Image.Source))
+		if err != nil {
+			return nil, err
+		}
+		defer sf.Close()
+
+		timg, _, err = image.Decode(sf)
+		if err != nil {
+			return nil, err
+		}
+		r.tileCache[cacheKey] = timg
 	} else {
-		sf, err := r.open(tile.Tileset.GetFileFullPath(tile.Tileset.Image.Source))
+		if ts.TileCount > 0 && tileID >= uint32(ts.TileCount) {
+			return nil, ErrTileImageNotFound
+		}
+
+		sf, err := r.open(ts.GetFileFullPath(ts.Image.Source))
 		if err != nil {
 			return nil, err
 		}
@@ -154,16 +211,19 @@ func (r *Renderer) getTileImage(tile *tiled.LayerTile) (image.Image, error) {
 			return nil, err
 		}
 
-		for i := uint32(0); i < uint32(tile.Tileset.TileCount); i++ {
-			rect := tile.Tileset.GetTileRect(i)
-			r.tileCache[i+tile.Tileset.FirstGID] = imaging.Crop(img, rect)
-			if tile.ID == i {
-				timg = r.tileCache[i+tile.Tileset.FirstGID]
+		for i := uint32(0); i < uint32(ts.TileCount); i++ {
+			rect := ts.GetTileRect(i)
+			r.tileCache[i+ts.FirstGID] = imaging.Crop(img, rect)
+			if tileID == i {
+				timg = r.tileCache[i+ts.FirstGID]
 			}
 		}
 	}
 
-	return r.engine.RotateTileImage(tile, timg), nil
+	if timg == nil {
+		return nil, ErrTileImageNotFound
+	}
+	return timg, nil
 }
 
 func (r *Renderer) _renderLayer(layer *tiled.Layer) error {

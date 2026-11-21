@@ -73,6 +73,42 @@ r, err := render.NewRendererWithFileSystem(tm, assets.Files)
 
 ```
 
+### Animated tiles
+
+Tiles carrying a TMX `<animation>` are rendered statically as placed in the
+map by default. To render the frame visible at a given point in time, call
+`SetAnimationTime` on the renderer; the animation then loops using each
+frame's duration, and the same time always produces the same image, so
+screenshots at a fixed time are deterministic. The flip, rotation and offset
+of the original placement are preserved, on both tile layers and tile
+objects, and atlas tilesets and image-collection tilesets behave identically.
+
+```go
+r, err := render.NewRenderer(gameMap)
+// ...
+
+// Render every animated tile at 250ms into its looping animation.
+r.SetAnimationTime(250 * time.Millisecond)
+if err := r.RenderVisibleLayers(); err != nil {
+    // ...
+}
+
+// Back to static rendering of the tiles as placed in the map.
+r.DisableAnimation()
+```
+
+Frame selection is also available without the renderer via
+`TilesetTile.FrameAt(timeMS)` and `Tileset.AnimatedTileID(tileID, timeMS)`.
+Animations whose frames all have a zero duration pin to their first frame,
+and frames referencing non-existent or imageless tiles fall back to the
+placed tile, so malformed definitions still yield a defined result.
+
+The `tmx2img` command exposes the same option through its `-time` flag:
+
+```sh
+tmx2img -time 500ms map.tmx map.png
+```
+
 ## Documentation
 
 For further documentation, see <https://pkg.go.dev/github.com/lafriks/go-tiled> or run:

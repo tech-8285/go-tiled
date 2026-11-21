@@ -11,6 +11,8 @@ import (
 )
 
 func main() {
+	// When omitted, animated tiles are rendered statically as placed in the map.
+	animationTime := flag.Duration("time", 0, "point in time of the tile animations to render (e.g. 500ms); animated tiles stay static when this flag is not provided")
 	flag.Parse()
 
 	filename := flag.Arg(0)
@@ -29,6 +31,19 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		return
+	}
+
+	// Whether -time was given at all; its zero value is indistinguishable from
+	// "not provided" via flag.Duration alone, and only the latter must keep
+	// animated tiles static.
+	timeSet := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "time" {
+			timeSet = true
+		}
+	})
+	if timeSet {
+		rend.SetAnimationTime(*animationTime)
 	}
 
 	if err = rend.RenderVisibleLayers(); err != nil {
