@@ -123,7 +123,7 @@ func TestStaggeredRendererEngine_GetObjectAnchor(t *testing.T) {
 	e := &StaggeredRendererEngine{}
 	e.Init(&tiled.Map{TileWidth: 32, TileHeight: 32, StaggerAxis: tiled.AxisY})
 
-	if got, want := e.GetObjectAnchor(image.Pt(10, 6)), image.Pt(0, 5); got != want {
+	if got, want := e.GetObjectAnchor(image.Pt(10, 6)), image.Pt(0, 6); got != want {
 		t.Errorf("GetObjectAnchor(10, 6) = %v, want %v", got, want)
 	}
 }

@@ -191,7 +191,9 @@ func (e *HexagonalRendererEngine) PixelToScreenCoords(x, y float64) (float64, fl
 
 // GetObjectAnchor returns the bottom-left point of a tile object's image. Tiled's
 // default tile-object alignment is bottom-center only for isometric maps; every
-// other orientation, including hexagonal, defaults to bottom-left.
+// other orientation, including hexagonal, defaults to bottom-left. The bottom
+// edge is imgSize.Y (one past the last pixel row) because Tiled's alignment
+// math is 0-based.
 func (e *HexagonalRendererEngine) GetObjectAnchor(imgSize image.Point) image.Point {
-	return image.Pt(0, imgSize.Y-1)
+	return image.Pt(0, imgSize.Y)
 }

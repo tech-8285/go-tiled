@@ -116,11 +116,11 @@ func (r *Renderer) open(f string) (io.ReadCloser, error) {
 	return r.fs.Open(filepath.ToSlash(f))
 }
 
-// TODO: tile.Tileset.TileRenderSize/FillMode aren't honored -- tiles are
-// always drawn at their native cropped/source size ("tile" render size
-// behavior). A tileset with TileRenderSize "grid" should instead have its
-// tiles scaled to the map's grid cell size, using FillMode ("stretch" or
-// "preserve-aspect-fit") to decide how; that resizing isn't implemented.
+// getTileImage loads the tile's native (cropped/decoded) image and applies
+// its flip/rotation flags. Tileset-level sizing (TileRenderSize/FillMode) is
+// deliberately not applied here: the same cached native image backs both tile
+// layers and tile objects, which may render it at different destination
+// sizes. Callers apply the appropriate resize for their context.
 func (r *Renderer) getTileImage(tile *tiled.LayerTile) (image.Image, error) {
 	timg, ok := r.tileCache[tile.Tileset.FirstGID+tile.ID]
 	if ok {
@@ -198,7 +198,16 @@ func (r *Renderer) _renderLayer(layer *tiled.Layer) error {
 				return err
 			}
 
+			// TileRenderSize "grid" renders every tile into the map's grid
+			// cell (using FillMode to decide how); the default "tile" leaves
+			// the native image untouched. Done after the flip/rotation so the
+			// resized result keeps the tile's transformation flags.
+			img = r.applyLayerTileRenderSize(layer.Tiles[i], img)
+
 			pos := r.engine.GetTilePosition(x, y, img.Bounds().Size())
+			// The tileset's drawing offset applies to every tile drawn from
+			// it, independently of grid anchoring and render size.
+			pos = pos.Add(tileOffset(layer.Tiles[i].Tileset))
 			rect := image.Rectangle{Min: pos, Max: pos.Add(img.Bounds().Size())}
 
 			// TODO: layer.Mode (compositing/blend mode, e.g. "multiply",

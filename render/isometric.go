@@ -110,7 +110,8 @@ func (e *IsometricRendererEngine) PixelToScreenCoords(x, y float64) (float64, fl
 }
 
 // GetObjectAnchor returns the bottom-center point of a tile object's image, per
-// the Tiled spec's isometric alignment rule.
+// the Tiled spec's isometric alignment rule. The bottom edge is imgSize.Y (one
+// past the last pixel row) because Tiled's alignment math is 0-based.
 func (e *IsometricRendererEngine) GetObjectAnchor(imgSize image.Point) image.Point {
-	return image.Pt(imgSize.X/2, imgSize.Y-1)
+	return image.Pt(imgSize.X/2, imgSize.Y)
 }

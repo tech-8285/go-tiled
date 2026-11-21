@@ -77,7 +77,8 @@ func (e *OrthogonalRendererEngine) PixelToScreenCoords(x, y float64) (float64, f
 }
 
 // GetObjectAnchor returns the bottom-left point of a tile object's image, per the
-// Tiled spec's orthogonal alignment rule.
+// Tiled spec's orthogonal alignment rule. The bottom edge is imgSize.Y (one past
+// the last pixel row) because Tiled's alignment math is 0-based.
 func (e *OrthogonalRendererEngine) GetObjectAnchor(imgSize image.Point) image.Point {
-	return image.Pt(0, imgSize.Y-1)
+	return image.Pt(0, imgSize.Y)
 }

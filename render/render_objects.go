@@ -183,25 +183,36 @@ func (r *Renderer) renderOneObject(layer *tiled.ObjectGroup, o *tiled.Object, sc
 		return err
 	}
 
-	bounds := img.Bounds()
-	srcSize := bounds.Size()
+	// A tile object without an explicit size (width/height 0, possible when
+	// created programmatically or via a template) renders at the tileset's
+	// declared tile size, matching Tiled's own MapObject bounds behavior.
 	dstSize := image.Pt(int(o.Width), int(o.Height))
-
-	if !srcSize.Eq(dstSize) {
-		img = imaging.Resize(img, dstSize.X, dstSize.Y, imaging.NearestNeighbor)
+	if dstSize.X <= 0 {
+		dstSize.X = tile.Tileset.TileWidth
+	}
+	if dstSize.Y <= 0 {
+		dstSize.Y = tile.Tileset.TileHeight
 	}
 
-	// TODO: tile.Tileset.ObjectAlignment isn't honored here -- alignment is
-	// always determined purely by the map's orientation (GetObjectAnchor),
-	// ignoring any per-tileset override (e.g. "topleft", "center", ...).
-	anchor := r.engine.GetObjectAnchor(img.Bounds().Size())
+	if !img.Bounds().Size().Eq(dstSize) {
+		// The tileset's FillMode decides how art whose aspect ratio doesn't
+		// match the object's rectangle is fitted; the object's own flip flags
+		// have already been applied by getTileImage.
+		img = resizeTileImage(img, dstSize, tile.Tileset.FillMode)
+	}
+
+	// A per-tileset ObjectAlignment overrides the orientation-dependent
+	// default anchor (bottom-left / bottom-center for isometric).
+	anchor := r.objectAnchor(tile.Tileset, img.Bounds().Size())
 
 	var originPoint image.Point
 
 	img, originPoint = r._rotateObjectImage(img, o.Rotation, anchor)
 
-	bounds = img.Bounds()
-	pos := bounds.Add(image.Pt(int(screenX), int(screenY)).Sub(originPoint))
+	bounds := img.Bounds()
+	// The tileset's tile offset shifts tile objects exactly as it shifts
+	// tiles on a tile layer.
+	pos := bounds.Add(image.Pt(int(screenX), int(screenY)).Sub(originPoint).Add(tileOffset(tile.Tileset)))
 
 	if layer.Opacity < 1 {
 		mask := image.NewUniform(color.Alpha{uint8(layer.Opacity * 255)})

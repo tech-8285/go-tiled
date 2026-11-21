@@ -7,6 +7,38 @@ import (
 	"path/filepath"
 )
 
+// Tile render sizes for Tileset.TileRenderSize (TMX "tilerendersize", since 1.9).
+const (
+	// TileRenderSizeTile draws tiles at their native image size (the default).
+	TileRenderSizeTile = "tile"
+	// TileRenderSizeGrid draws tiles scaled into the map's grid cell size.
+	TileRenderSizeGrid = "grid"
+)
+
+// Fill modes for Tileset.FillMode (TMX "fillmode", since 1.9).
+const (
+	// FillModeStretch scales tile art to fill the destination rectangle,
+	// ignoring its aspect ratio (the default).
+	FillModeStretch = "stretch"
+	// FillModePreserveAspectFit scales tile art uniformly so it fits inside
+	// the destination rectangle while keeping its aspect ratio.
+	FillModePreserveAspectFit = "preserve-aspect-fit"
+)
+
+// Object alignment values for Tileset.ObjectAlignment (TMX "objectalignment", since 1.4).
+const (
+	ObjectAlignmentUnspecified = "unspecified"
+	ObjectAlignmentTopLeft     = "topleft"
+	ObjectAlignmentTop         = "top"
+	ObjectAlignmentTopRight    = "topright"
+	ObjectAlignmentLeft        = "left"
+	ObjectAlignmentCenter      = "center"
+	ObjectAlignmentRight       = "right"
+	ObjectAlignmentBottomLeft  = "bottomleft"
+	ObjectAlignmentBottom      = "bottom"
+	ObjectAlignmentBottomRight = "bottomright"
+)
+
 // Tileset is collection of tiles
 type Tileset struct {
 	// Base directory

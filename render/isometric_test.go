@@ -119,19 +119,20 @@ func TestOrthogonalRendererEngine_PixelToScreenCoords(t *testing.T) {
 
 // TestGetObjectAnchor verifies each engine picks the tile-object alignment
 // point mandated by the Tiled spec: bottom-left for orthogonal, bottom-center
-// for isometric.
+// for isometric. Edges are 0-based (the bottom edge is image height, one past
+// the last pixel row), matching Tiled's alignmentOffset math.
 func TestGetObjectAnchor(t *testing.T) {
 	imgSize := image.Pt(10, 6)
 
 	ortho := &OrthogonalRendererEngine{}
 	ortho.Init(&tiled.Map{})
-	if got, want := ortho.GetObjectAnchor(imgSize), image.Pt(0, 5); got != want {
+	if got, want := ortho.GetObjectAnchor(imgSize), image.Pt(0, 6); got != want {
 		t.Errorf("OrthogonalRendererEngine.GetObjectAnchor(%v) = %v, want %v", imgSize, got, want)
 	}
 
 	iso := &IsometricRendererEngine{}
 	iso.Init(&tiled.Map{})
-	if got, want := iso.GetObjectAnchor(imgSize), image.Pt(5, 5); got != want {
+	if got, want := iso.GetObjectAnchor(imgSize), image.Pt(5, 6); got != want {
 		t.Errorf("IsometricRendererEngine.GetObjectAnchor(%v) = %v, want %v", imgSize, got, want)
 	}
 }
